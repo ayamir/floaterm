@@ -61,6 +61,8 @@ M.switch_buf = function(buf)
   api.nvim_set_current_win(state.win)
   api.nvim_set_current_buf(buf)
 
+  M.restore_terminal_state(buf)
+
   local details = vim.tbl_filter(function(x)
     return x.buf == buf
   end, state.terminals)
@@ -101,7 +103,11 @@ M.switch_buf = function(buf)
   end
 
   if state.config.autoinsert then
-    vim.cmd.startinsert()
+    vim.defer_fn(function()
+      if api.nvim_buf_is_valid(buf) and api.nvim_get_current_buf() == buf then
+        vim.cmd.startinsert()
+      end
+    end, 50)
   end
 end
 
@@ -127,9 +133,34 @@ M.get_buf_on_cursor = function()
 end
 
 M.close_timers = function()
-  state.bar_redraw_timer:stop()
-  state.bar_redraw_timer:close()
-  state.bar_redraw_timer = nil
+  if state.bar_redraw_timer then
+    state.bar_redraw_timer:stop()
+    state.bar_redraw_timer:close()
+    state.bar_redraw_timer = nil
+  end
+end
+
+M.save_terminal_state = function(buf)
+  if buf and api.nvim_buf_is_valid(buf) then
+    local pos = api.nvim_win_get_cursor(0)
+    state.terminal_states[buf] = {
+      cursor_pos = pos,
+      modified = api.nvim_buf_get_option(buf, "modified"),
+      lines = api.nvim_buf_get_lines(buf, 0, -1, false),
+    }
+  end
+end
+
+M.restore_terminal_state = function(buf)
+  if buf and state.terminal_states[buf] and api.nvim_buf_is_valid(buf) then
+    local state_info = state.terminal_states[buf]
+    if state_info.cursor_pos then
+      local win = api.nvim_get_current_win()
+      if api.nvim_win_get_buf(win) == buf then
+        pcall(api.nvim_win_set_cursor, win, state_info.cursor_pos)
+      end
+    end
+  end
 end
 
 return M

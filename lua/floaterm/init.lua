@@ -30,8 +30,8 @@ M.open = function()
 
   local sidebar_w = 20
 
-  if conf.position then 
-     conf.position = type(conf.position) == 'table' and conf.position or conf.position()
+  if conf.position then
+    conf.position = type(conf.position) == "table" and conf.position or conf.position()
   end
 
   local pos_row = conf.position and conf.position.row or (vim.o.lines / 2 - state.h / 2) - 1
@@ -140,10 +140,23 @@ M.open = function()
       end)
     end,
   })
+
+  api.nvim_create_autocmd({ "WinEnter", "BufEnter" }, {
+    group = "FloatermAu",
+    callback = function(args)
+      if state.volt_set and utils.get_term_by_key(args.buf) then
+        utils.save_terminal_state(args.buf)
+      end
+    end,
+  })
 end
 
 M.toggle = function()
   if state.volt_set then
+    if state.buf and api.nvim_buf_is_valid(state.buf) then
+      utils.save_terminal_state(state.buf)
+    end
+
     api.nvim_win_close(state.win, false)
     api.nvim_win_close(state.barwin, false)
     api.nvim_win_close(state.sidewin, false)
